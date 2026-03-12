@@ -104,8 +104,10 @@ const SAMPLE_RESUME = {
     {
       id: 1,
       name: "OpenMetrics",
-      desc: "Open-source observability platform with 2K+ GitHub stars",
+      desc: "Open-source observability platform with 2K+ GitHub stars. Built a distributed metrics collection system that aggregates data from 500+ endpoints. Implemented real-time alerting with sub-second latency.",
       tech: "Go, Prometheus, Grafana",
+      url: "github.com/alexchen/openmetrics",
+      period: "2022 – Present",
     },
   ],
 };
@@ -517,9 +519,13 @@ function ResumePreview({ resume, template }) {
         <>
           <div style={s.sectionTitle}>Projects</div>
           {resume.projects.map((p) => (
-            <div key={p.id} style={{ marginBottom: 10 }}>
-              <div style={s.expTitle}>{p.name} <span style={{ fontWeight: 400, color: "#64748b" }}>— {p.tech}</span></div>
-              <div style={{ fontSize: 11.5, color: "#334155" }}>{p.desc}</div>
+            <div key={p.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={s.expTitle}>{p.name} <span style={{ fontWeight: 400, color: "#64748b" }}>— {p.tech}</span></div>
+                {p.period && <span style={{ fontSize: 11, color: "#64748b" }}>{p.period}</span>}
+              </div>
+              {p.url && <div style={{ fontSize: 11, color: "#6366f1", marginBottom: 2 }}><a href={p.url.startsWith("http") ? p.url : `https://${p.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", textDecoration: "none" }}>🔗 {p.url}</a></div>}
+              {p.desc && <div style={{ fontSize: 11, color: "#334155", lineHeight: 1.6 }}>{p.desc}</div>}
             </div>
           ))}
         </>
@@ -561,6 +567,18 @@ function BuilderPage({ resume, setResume, template, setTemplate }) {
           `Rewrite this professional summary to be more compelling, concise, and impact-focused for a ${resume.title}.\n\nCurrent: ${resume.summary}\n\nReturn only the improved summary (2-3 sentences).`
         );
         updateResume("summary", result.trim());
+      } else if (type === "project-desc") {
+        const project = resume.projects[index];
+        const safeName = (project.name || "").replace(/[^\w\s\-.,()]/g, "").slice(0, 100);
+        const safeTech = (project.tech || "not specified").replace(/[^\w\s\-.,()]/g, "").slice(0, 100);
+        const result = await callClaude(
+          `Write a compelling 2-3 sentence project description for a resume. Project: "${safeName}". Tech stack: ${safeTech}.\n\nFocus on the problem solved, technologies used, and measurable impact. Return only the description text.`,
+          "You are an expert resume writer. Return only the project description, no explanation."
+        );
+        setResume((p) => ({
+          ...p,
+          projects: p.projects.map((proj, i) => i === index ? { ...proj, desc: result.trim() } : proj),
+        }));
       }
     } catch (e) {
       console.error(e);
@@ -793,21 +811,37 @@ function BuilderPage({ resume, setResume, template, setTemplate }) {
 
           {tab === "projects" && (
             <div>
-              {resume.projects.map((p) => (
+              {resume.projects.map((p, idx) => (
                 <div key={p.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>Project</span>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>Project {idx + 1}</span>
                     <button onClick={() => setResume((r) => ({ ...r, projects: r.projects.filter((x) => x.id !== p.id) }))} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 18 }}>×</button>
                   </div>
-                  {[["Project Name", "name"], ["Tech Stack", "tech"], ["Description", "desc"]].map(([label, key]) => (
-                    <div key={key} style={{ marginBottom: 10 }}>
-                      <label style={labelStyle}>{label}</label>
-                      <input style={inputStyle} value={p[key]} onChange={(e) => setResume((r) => ({ ...r, projects: r.projects.map((x) => x.id === p.id ? { ...x, [key]: e.target.value } : x) }))} placeholder={label} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 10 }}>
+                    {[["Project Name", "name"], ["Tech Stack", "tech"], ["Project URL", "url"], ["Time Period", "period"]].map(([label, key]) => (
+                      <div key={key}>
+                        <label style={labelStyle}>{label}</label>
+                        <input style={inputStyle} value={p[key] || ""} onChange={(e) => setResume((r) => ({ ...r, projects: r.projects.map((x) => x.id === p.id ? { ...x, [key]: e.target.value } : x) }))} placeholder={label} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <label style={labelStyle}>Description</label>
+                      <button style={aiBtnStyle(loading[`project-desc-${idx}`])} onClick={() => aiImprove("project-desc", idx)}>
+                        {loading[`project-desc-${idx}`] ? "⏳" : "🤖"} Generate
+                      </button>
                     </div>
-                  ))}
+                    <textarea
+                      style={{ ...inputStyle, height: 90, resize: "vertical" }}
+                      value={p.desc || ""}
+                      onChange={(e) => setResume((r) => ({ ...r, projects: r.projects.map((x) => x.id === p.id ? { ...x, desc: e.target.value } : x) }))}
+                      placeholder="Describe the project, technologies used, and measurable impact..."
+                    />
+                  </div>
                 </div>
               ))}
-              <button onClick={() => setResume((r) => ({ ...r, projects: [...r.projects, { id: Date.now(), name: "", tech: "", desc: "" }] }))} style={{ width: "100%", padding: 12, border: "2px dashed #cbd5e1", background: "none", borderRadius: 10, color: "#6366f1", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+              <button onClick={() => setResume((r) => ({ ...r, projects: [...r.projects, { id: Date.now(), name: "", tech: "", desc: "", url: "", period: "" }] }))} style={{ width: "100%", padding: 12, border: "2px dashed #cbd5e1", background: "none", borderRadius: 10, color: "#6366f1", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
                 + Add Project
               </button>
             </div>
