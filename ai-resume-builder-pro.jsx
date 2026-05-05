@@ -118,7 +118,11 @@ const SAMPLE_RESUME = {
 async function callClaude(prompt, systemPrompt = "") {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
@@ -126,6 +130,10 @@ async function callClaude(prompt, systemPrompt = "") {
       messages: [{ role: "user", content: prompt }],
     }),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API error ${response.status}`);
+  }
   const data = await response.json();
   return data.content?.[0]?.text || "";
 }
@@ -547,7 +555,7 @@ function BuilderPage({ resume, setResume, template, setTemplate }) {
   const updateResume = (key, val) => setResume((p) => ({ ...p, [key]: val }));
 
   const aiImprove = async (type, index) => {
-    const key = `${type}-${index}`;
+    const key = index !== undefined ? `${type}-${index}` : type;
     setLoad(key, true);
     try {
       if (type === "bullet") {
